@@ -9,17 +9,19 @@
       ansible.builtin.apt:
         update_cache: yes
         upgrade: dist
-        # Wait up to 5 minutes if background updates are running
         lock_timeout: 300
       register: apt_result
 
-    - name: Comprehensive disk cleanup
+    - name: Remove unused packages and purge configs
       ansible.builtin.apt:
         autoremove: yes
-        purge: yes
-        autoclean: yes
-      # Only run if something actually changed to save time
+        purge: yes  # This works here with autoremove
       when: apt_result.changed 
+
+    - name: Clear local repository of retrieved package files
+      ansible.builtin.apt:
+        autoclean: yes # This must be separate to avoid the error
+      when: apt_result.changed
 
     - name: Check if a reboot is required
       ansible.builtin.stat:
@@ -30,9 +32,5 @@
     - name: Reboot the server
       ansible.builtin.reboot:
         msg: "Rebooting to apply kernel updates"
-        connect_timeout: 5
         reboot_timeout: 300
-        pre_reboot_delay: 0
-        post_reboot_delay: 30
-        test_command: uptime
       when: reboot_required_file.stat.exists
