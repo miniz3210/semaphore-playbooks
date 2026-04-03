@@ -1,23 +1,38 @@
-- hosts: all
-  gather_facts: yes
-  become: yes
+---
+- name: Optimized System Maintenance
+  hosts: all
+  become: true
+  gather_facts: true
 
   tasks:
-    - name: Perform a dist-upgrade.
+    - name: Upgrade all packages with lock handling
       ansible.builtin.apt:
-        upgrade: dist
         update_cache: yes
+        upgrade: dist
+        # Wait up to 5 minutes if background updates are running
+        lock_timeout: 300
+      register: apt_result
 
-    - name: Check if a reboot is required.
+    - name: Comprehensive disk cleanup
+      ansible.builtin.apt:
+        autoremove: yes
+        purge: yes
+        autoclean: yes
+      # Only run if something actually changed to save time
+      when: apt_result.changed 
+
+    - name: Check if a reboot is required
       ansible.builtin.stat:
         path: /var/run/reboot-required
         get_checksum: no
       register: reboot_required_file
 
-    - name: Reboot the server (if required).
+    - name: Reboot the server
       ansible.builtin.reboot:
-      when: reboot_required_file.stat.exists == true
-
-    - name: Remove dependencies that are no longer required.
-      ansible.builtin.apt:
-        autoremove: yes
+        msg: "Rebooting to apply kernel updates"
+        connect_timeout: 5
+        reboot_timeout: 300
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: uptime
+      when: reboot_required_file.stat.exists
