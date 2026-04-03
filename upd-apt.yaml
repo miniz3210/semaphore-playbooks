@@ -1,15 +1,56 @@
+#---
+#- name: Update and upgrade apt packages
+#  hosts: all
+#  become: true
+#
+#  tasks:
+#    - name: Update packages with apt
+#      when: ansible_pkg_mgr == 'apt'
+#      ansible.builtin.apt:
+#        update_cache: true
+#
+#    - name: Upgrade packages with apt
+#      when: ansible_pkg_mgr == 'apt'
+#      ansible.builtin.apt:
+#        upgrade: dist
+
+
 ---
-- name: Update and upgrade apt packages
+- name: Comprehensive System Maintenance
   hosts: all
   become: true
+  gather_facts: true
 
   tasks:
-    - name: Update packages with apt
-      when: ansible_pkg_mgr == 'apt'
+    - name: Wait for APT lock (handles background updates)
       ansible.builtin.apt:
-        update_cache: true
-
-    - name: Upgrade packages with apt
+        update_cache: yes
+        # This tells Ansible to wait up to 5 mins for the lock
+        lock_timeout: 300
       when: ansible_pkg_mgr == 'apt'
+
+    - name: Perform Full System Upgrade
       ansible.builtin.apt:
         upgrade: dist
+        # Ensuring we don't fail if a lock is held temporarily
+        lock_timeout: 300
+      register: upgrade_result
+      when: ansible_pkg_mgr == 'apt'
+
+    - name: Clean up disk space (Prevent future 100% full)
+      ansible.builtin.apt:
+        autoremove: yes
+        purge: yes
+        autoclean: yes
+      when: ansible_pkg_mgr == 'apt'
+
+    - name: Check if a reboot is required
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required_file
+
+    - name: Restart Docker services to ensure health
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+      when: upgrade_result.changed
