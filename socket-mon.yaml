@@ -12,8 +12,8 @@
       ansible.builtin.command:
         cmd: "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:{{ proxy_port }}/_ping"
       register: proxy_ping_cmd
+      failed_when: false  # Prevents Ansible from flagging curl exit code 7 as a task error
       changed_when: false
-      ignore_errors: true
 
     - name: Display socket-proxy health status
       ansible.builtin.debug:
@@ -59,7 +59,7 @@
           VERSION: "1"
           VOLUMES: "1"
           LOGS: "1"
-          ALLOW_LOGS: "1"   # Required by linuxserver/socket-proxy for /containers/{id}/logs
+          ALLOW_LOGS: "1"
           POST: "1"
           START: "1"
           STOP: "1"
