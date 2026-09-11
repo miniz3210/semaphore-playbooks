@@ -1,6 +1,6 @@
 ---
 - name: Monitor and Maintain Docker Socket Proxy Remotely
-  hosts: docker_hosts  # Target your remote Docker host group from Semaphore inventory
+  hosts: all  # Matches any inventory configured in Semaphore
   gather_facts: false
 
   vars:
