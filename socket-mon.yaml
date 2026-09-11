@@ -59,6 +59,7 @@
           VERSION: "1"
           VOLUMES: "1"
           LOGS: "1"
+          ALLOW_LOGS: "1"   # Required by linuxserver/socket-proxy for /containers/{id}/logs
           POST: "1"
           START: "1"
           STOP: "1"
