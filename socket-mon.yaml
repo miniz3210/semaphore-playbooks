@@ -1,11 +1,10 @@
 ---
-- name: Monitor and Maintain Docker Socket Proxy Remotely
-  hosts: all  # Matches any inventory configured in Semaphore
+- name: Monitor, Recreate, and Maintain Docker Socket Proxy Remotely
+  hosts: all
   gather_facts: false
 
   vars:
-    # Use the inventory hostname/IP of the remote Docker server for the HTTP check
-    proxy_host: "{{ ansible_host | default(inventory_hostname) }}"
+    proxy_host: "{{ inventory_hostname }}"
     proxy_port: "2375"
     container_name: "socket-proxy"
 
@@ -17,27 +16,55 @@
         status_code: 200
         timeout: 5
       register: proxy_ping
-      delegate_to: localhost  # Performs the HTTP check directly from the Semaphore runner
+      delegate_to: localhost
       ignore_errors: true
 
     - name: Display socket-proxy health status
       ansible.builtin.debug:
         msg: >-
           {{
-            'socket-proxy on ' ~ proxy_host ~ ' is HEALTHY and responding.'
+            'socket-proxy on ' ~ proxy_host ~ ' is HEALTHY.'
             if proxy_ping.status == 200
-            else 'socket-proxy on ' ~ proxy_host ~ ' is UNHEALTHY or DOWN (HTTP ' ~ (proxy_ping.status | default('Timeout/Error')) ~ ').'
+            else 'socket-proxy on ' ~ proxy_host ~ ' is UNHEALTHY or DOWN (HTTP ' ~ (proxy_ping.status | default('Timeout/Error')) ~ '). Recreating container...'
           }}
 
-    - name: Restart socket-proxy via SSH on the target server
+    - name: Stop and remove socket-proxy if unhealthy or down
       community.docker.docker_container:
         name: "{{ container_name }}"
-        state: started
-        restart: true
+        state: absent
+        force_kill: true
       when: proxy_ping.status != 200
 
-    - name: Ensure container restart policy is set to unless-stopped
+    - name: Recreate socket-proxy container
       community.docker.docker_container:
         name: "{{ container_name }}"
+        image: lscr.io/linuxserver/socket-proxy:latest
         state: started
         restart_policy: unless-stopped
+        read_only: true
+        published_ports:
+          - "2375:2375"
+        volumes:
+          - "/var/run/docker.sock:/var/run/docker.sock:ro"
+        tmpfs:
+          - "/run"
+          - "/tmp"
+          - "/config"
+          - "/var/lib/haproxy"
+        env:
+          LOG_LEVEL: "warning"
+          TZ: "Europe/London"
+          CONTAINERS: "1"
+          EVENTS: "1"
+          IMAGES: "1"
+          INFO: "1"
+          NETWORKS: "1"
+          PING: "1"
+          VERSION: "1"
+          VOLUMES: "1"
+          LOGS: "1"
+          POST: "1"
+          START: "1"
+          STOP: "1"
+          RESTART: "1"
+      when: proxy_ping.status != 200
