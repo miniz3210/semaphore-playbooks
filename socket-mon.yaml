@@ -4,28 +4,24 @@
   gather_facts: false
 
   vars:
-    proxy_host: "{{ inventory_hostname }}"
     proxy_port: "2375"
     container_name: "socket-proxy"
 
   tasks:
-    - name: Check if socket-proxy API is responding remotely
-      ansible.builtin.uri:
-        url: "http://{{ proxy_host }}:{{ proxy_port }}/_ping"
-        method: GET
-        status_code: 200
-        timeout: 5
-      register: proxy_ping
-      delegate_to: localhost
+    - name: Check if socket-proxy API is responding locally on target host
+      ansible.builtin.command:
+        cmd: "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:{{ proxy_port }}/_ping"
+      register: proxy_ping_cmd
+      changed_when: false
       ignore_errors: true
 
     - name: Display socket-proxy health status
       ansible.builtin.debug:
         msg: >-
           {{
-            'socket-proxy on ' ~ proxy_host ~ ' is HEALTHY.'
-            if proxy_ping.status == 200
-            else 'socket-proxy on ' ~ proxy_host ~ ' is UNHEALTHY or DOWN (HTTP ' ~ (proxy_ping.status | default('Timeout/Error')) ~ '). Recreating container...'
+            'socket-proxy on ' ~ inventory_hostname ~ ' is HEALTHY.'
+            if proxy_ping_cmd.stdout == '200'
+            else 'socket-proxy on ' ~ inventory_hostname ~ ' is UNHEALTHY or DOWN (HTTP ' ~ proxy_ping_cmd.stdout ~ '). Recreating container...'
           }}
 
     - name: Stop and remove socket-proxy if unhealthy or down
@@ -33,7 +29,7 @@
         name: "{{ container_name }}"
         state: absent
         force_kill: true
-      when: proxy_ping.status != 200
+      when: proxy_ping_cmd.stdout != '200'
 
     - name: Recreate socket-proxy container
       community.docker.docker_container:
@@ -67,4 +63,4 @@
           START: "1"
           STOP: "1"
           RESTART: "1"
-      when: proxy_ping.status != 200
+      when: proxy_ping_cmd.stdout != '200'
