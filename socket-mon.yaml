@@ -1,0 +1,43 @@
+---
+- name: Monitor and Maintain Docker Socket Proxy Remotely
+  hosts: docker_hosts  # Target your remote Docker host group from Semaphore inventory
+  gather_facts: false
+
+  vars:
+    # Use the inventory hostname/IP of the remote Docker server for the HTTP check
+    proxy_host: "{{ ansible_host | default(inventory_hostname) }}"
+    proxy_port: "2375"
+    container_name: "socket-proxy"
+
+  tasks:
+    - name: Check if socket-proxy API is responding remotely
+      ansible.builtin.uri:
+        url: "http://{{ proxy_host }}:{{ proxy_port }}/_ping"
+        method: GET
+        status_code: 200
+        timeout: 5
+      register: proxy_ping
+      delegate_to: localhost  # Performs the HTTP check directly from the Semaphore runner
+      ignore_errors: true
+
+    - name: Display socket-proxy health status
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            'socket-proxy on ' ~ proxy_host ~ ' is HEALTHY and responding.'
+            if proxy_ping.status == 200
+            else 'socket-proxy on ' ~ proxy_host ~ ' is UNHEALTHY or DOWN (HTTP ' ~ (proxy_ping.status | default('Timeout/Error')) ~ ').'
+          }}
+
+    - name: Restart socket-proxy via SSH on the target server
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        state: started
+        restart: true
+      when: proxy_ping.status != 200
+
+    - name: Ensure container restart policy is set to unless-stopped
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        state: started
+        restart_policy: unless-stopped
