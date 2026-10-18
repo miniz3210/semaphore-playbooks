@@ -9,7 +9,7 @@
 
     - name: Wait for AP to come back online
       ansible.builtin.wait_for:
-        host: "{{ ansible_host }}"
+        host: "{{ ansible_host | default(inventory_hostname) }}"
         port: 22
         state: started
         delay: 15
