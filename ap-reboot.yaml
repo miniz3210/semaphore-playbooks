@@ -1,6 +1,6 @@
 ---
 - name: Reboot Network Access Points
-  hosts: access_points
+  hosts: all
   gather_facts: false
   tasks:
     - name: Issue reboot command
