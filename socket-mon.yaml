@@ -54,6 +54,7 @@
           EVENTS: "1"
           IMAGES: "1"
           INFO: "1"
+          SYSTEM: "1"
           NETWORKS: "1"
           PING: "1"
           VERSION: "1"
