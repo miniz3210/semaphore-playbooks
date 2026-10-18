@@ -1,14 +1,13 @@
 ---
 - name: Reboot Network Access Points
-  hosts: AX9000
+  hosts: access_points
   gather_facts: false
   tasks:
-    - name: Issue reboot command to the AP
+    - name: Issue reboot command
       ansible.builtin.raw: reboot
       ignore_errors: true
-      register: reboot_cmd
 
-    - name: Wait for AP to go down and come back online
+    - name: Wait for AP to come back online
       ansible.builtin.wait_for:
         host: "{{ ansible_host }}"
         port: 22
